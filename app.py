@@ -5,6 +5,8 @@ import altair as alt
 import math
 
 
+margin_applied = 0.1
+
 st.logo("logo.png", size = "large")
 
 # Initialize an empty DataFrame to store simulation dates
@@ -16,9 +18,6 @@ if "current_date" not in st.session_state:
     st.session_state.current_date = datetime.date(2024, 1, 2)
 
 st.header("Guardian")
-
-st.text_input("**Your name**", key="name")
-
 st.subheader("Information on current day")
 
 # Move the buttons to the sidebar
@@ -109,7 +108,7 @@ except Exception as e:
 
 st.divider()
 
-st.header("Select Options")
+st.subheader("Quantity of protection")
 
 # Dropdown to choose between "Number of Contracts" or "Barrels of Oil"
 quantity_type = st.selectbox("Choose Quantity Type:", ["Number of Contracts", "Barrels of Oil"])
@@ -140,7 +139,11 @@ elif quantity_type == "Barrels of Oil":
     with col2:
         st.metric(label="Equivalent in Contracts", value=f"{slider_value / 1000:.2f} contracts")
 
-st.subheader("Select Contract Date")
+    st.session_state.number_of_barrels = slider_value  # Store the number of contracts for later use
+
+
+
+st.subheader("Product specification")
 
 # Create four columns for the buttons
 col1, col2, col3, col4 = st.columns(4)
@@ -149,31 +152,24 @@ col1, col2, col3, col4 = st.columns(4)
 if "contract_date" not in st.session_state:
     st.session_state.contract_date = None
 
-# Button for Jun '24
-with col1:
-    if st.button("Jun '24"):
-        st.session_state.contract_date = datetime.date(2024, 6, 1)
+# Replace buttons with a segmented control for contract dates
+contract_options = {
+    "Jun '24": datetime.date(2024, 6, 1),
+    "Sept '24": datetime.date(2024, 9, 1),
+    "Dec '24": datetime.date(2024, 12, 1),
+    "Mar '25": datetime.date(2025, 3, 1),
+}
 
-# Button for Sept '24
-with col2:
-    if st.button("Sept '24"):
-        st.session_state.contract_date = datetime.date(2024, 9, 1)
+selected_contract = st.segmented_control(
+    label="Select Contract Date",
+    options=list(contract_options.keys()),
+    default=None,
+    key="contract_date_selector",
+)
 
-# Button for Dec '24
-with col3:
-    if st.button("Dec '24"):
-        st.session_state.contract_date = datetime.date(2024, 12, 1)
-
-# Button for Mar '25
-with col4:
-    if st.button("Mar '25"):
-        st.session_state.contract_date = datetime.date(2025, 3, 1)
-
-# Display the selected contract date using st.metric
-if st.session_state.contract_date:
-    st.metric(label="Selected Contract Date", value=st.session_state.contract_date.strftime('%Y-%m-%d'))
-else:
-    st.metric(label="Selected Contract Date", value="N/A")
+# Update the session state with the selected contract date
+if selected_contract:
+    st.session_state.contract_date = contract_options[selected_contract]
 
 # Ensure current_price is set (replace with your logic if needed)
 if current_price is None:
@@ -187,34 +183,36 @@ def next_increment(value, step=2.5, min_val=50, max_val=90):
 # Calculate the next increment of 2.5 greater than the current price
 next_price = next_increment(current_price)
 
-st.subheader("Select Strike Price")
+# Create a select slider for strike prices
+strike_options = [next_price + 2.5, next_price + 5.0, next_price + 7.5, next_price + 10.0]
 
-# Create 4 buttons
-col1, col2, col3, col4 = st.columns(4)
+# Define a format function for the slider
+def special_internal_function(value):
+    return f"{value:.1f}"
 
-selected_strike = None  # Variable to store the selected strike value
+selected_strike = st.select_slider(
+    label="Select Guarantee Price",
+    options=strike_options,
+    value=strike_options[1],
+    format_func=special_internal_function
+)
+
+# Create two columns for side-by-side display
+col1, col2 = st.columns(2)
 
 with col1:
-    if st.button(f"{next_price + 2.5:.1f}"):
-        selected_strike = next_price + 2.5
+    # Display the selected contract date using st.metric
+    if st.session_state.contract_date:
+        st.metric(label="Protect Until", value=st.session_state.contract_date.strftime('%Y-%m-%d'))
+    else:
+        st.metric(label="Protect Until", value="N/A")
 
 with col2:
-    if st.button(f"{next_price + 5.0:.1f}"):
-        selected_strike = next_price + 5.0
-
-with col3:
-    if st.button(f"{next_price + 7.5:.1f}"):
-        selected_strike = next_price + 7.5
-
-with col4:
-    if st.button(f"{next_price + 10.0:.1f}"):
-        selected_strike = next_price + 10.0
-
-# Display the selected strike price using st.metric
-if selected_strike is not None:
-    st.metric(label="Selected Strike Price", value=f"{selected_strike:.1f}")
-else:
-    st.metric(label="Selected Strike Price", value="N/A")
+    # Display the selected strike price using st.metric
+    if selected_strike is not None:
+        st.metric(label="Selected Strike Price", value=f"{selected_strike:.1f}")
+    else:
+        st.metric(label="Selected Strike Price", value="N/A")
 
 # Map contract dates to corresponding file names
 contract_files = {
@@ -224,8 +222,8 @@ contract_files = {
     datetime.date(2025, 3, 1): "./expired_options_settle/settle_CL_C25.csv",
 }
 
-filtered_df_contract = None
-filtered_df_contract_filtered_date = None
+filtered_df_strike = None
+filtered_df_strike_date = None
 
 # Check if a contract date is selected
 if st.session_state.contract_date:
@@ -249,11 +247,64 @@ if st.session_state.contract_date:
 
             # Filter the DataFrame based on the selected strike value
             if selected_strike is not None:
-                filtered_df_contract = contract_df[contract_df['Strike'] == selected_strike]
-                st.write(f"### Strike: {selected_strike:.1f} and Contract Date: {st.session_state.contract_date}")
+                filtered_df_strike = contract_df[contract_df['Strike'] == selected_strike]
+            #   st.write(f"### Strike: {selected_strike:.1f} and Contract Date: {st.session_state.contract_date}")
 
-                filtered_df_contract_filtered_date = filtered_df_contract[filtered_df_contract['Date'] == st.session_state.current_date.strftime('%Y-%m-%d')]
-                st.dataframe(filtered_df_contract_filtered_date)
+                filtered_df_strike_date = filtered_df_strike[filtered_df_strike['Date'] == st.session_state.current_date.strftime('%Y-%m-%d')]
+            #   st.dataframe(filtered_df_contract_filtered_date)
+
+            #   st.write(f"### Filtered DataFrame: {filtered_df_contract_filtered_date}")
+
+
+                if not filtered_df_strike_date.empty:
+                    st.metric(label="Price of Insurance per Barrel", value=f"${filtered_df_strike_date['Settlement Price'].iloc[0]*margin_applied:.2f}")
+                
+                    st.text_input("**Your name**", key="name")
+
+                    # Button to purchase insurance
+                    if st.button("Purchase Insurance"):
+                        # Check if the user has entered their name
+                        if 'name' not in st.session_state or st.session_state.name == "":
+                            st.error("Please enter your name before purchasing insurance.")
+                        elif filtered_df_strike_date is not None and not filtered_df_strike_date.empty:
+                            # Extract the settlement price
+                            settlement_price = filtered_df_strike_date['Settlement Price'].iloc[0]
+
+                            exp_date = filtered_df_strike_date['Expiry_Date'].iloc[0]
+
+                            # Calculate raw cost
+                            raw_cost = settlement_price * st.session_state.number_of_barrels
+
+                            # Calculate the total cost
+                            total_cost = raw_cost * margin_applied
+
+                            # Record the purchase details
+                            purchase_details = {
+                                "User Name": st.session_state.name,
+                                "Sim Date": st.session_state.current_date,
+                                "Exp Date": exp_date,
+                                "Stk Price": selected_strike,
+                                "Contracts Bought": st.session_state.number_of_barrels / 1000,
+                                "Sett. Price": settlement_price,
+                                "Raw Cost": raw_cost,
+                                "Profit": raw_cost * margin_applied,
+                                "Total Cost": total_cost
+                            }
+
+                            # Append the purchase details to the session state DataFrame
+                            if "purchase_history" not in st.session_state:
+                                st.session_state.purchase_history = pd.DataFrame(columns=purchase_details.keys())
+
+                            st.session_state.purchase_history = pd.concat(
+                                [st.session_state.purchase_history, pd.DataFrame([purchase_details])],
+                                ignore_index=True
+                            )
+
+                            st.success("Insurance purchased successfully!")
+                        else:
+                            st.error("Unable to purchase insurance. Please ensure all selections are valid.")
+                else:
+                    st.metric(label="Price of Insurance per Barrel", value="Insurance not available")
 
         except FileNotFoundError:
             st.error(f"The file '{selected_file}' was not found. Please ensure it exists in the directory.")
@@ -261,47 +312,48 @@ if st.session_state.contract_date:
             st.error(f"An error occurred while reading the file: {e}")
     else:
         st.warning("No file is mapped to the selected contract date.")
-if filtered_df_contract_filtered_date is not None:
-    if not filtered_df_contract_filtered_date.empty:
-        # Display the filtered DataFrame    
-        # Extract the Settlement Price
-        settlement_price = filtered_df_contract_filtered_date['Settlement Price'].iloc[0]
 
-        # Calculate the total value
-        total_value = settlement_price * st.session_state.number_of_barrels
+# if filtered_df_strike_date is not None:
+#     if not filtered_df_strike_date.empty:
+#         # Display the filtered DataFrame    
+#         # Extract the Settlement Price
+#         settlement_price = filtered_df_strike_date['Settlement Price'].iloc[0]
 
-        # Display the result
-        st.write(f"**Settlement Price:** {settlement_price:.2f}")
-        st.write(f"**Number of Barrels:** {st.session_state.number_of_barrels}")
-        st.write(f"**Total Cost (raw):** {total_value}")
+#         # Calculate the total value
+#         total_value = settlement_price * st.session_state.number_of_barrels
+
+#         # Display the result
+#         st.write(f"**Settlement Price:** {settlement_price:.2f}")
+#         st.write(f"**Number of Barrels:** {st.session_state.number_of_barrels}")
+#         st.write(f"**Total Cost (raw):** {total_value}")
         
-        # Display the total value as the most important number
-        st.markdown(
-            f"""
-            <div style="
-                margin-top: 30px;
-                width: 100%;
-            ">
-                <div style="
-                    background: rgba(255, 255, 255, 0.05);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    border-radius: 16px;
-                    padding: 30px 40px;
-                    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-                    backdrop-filter: blur(8px);
-                    -webkit-backdrop-filter: blur(8px);
-                    text-align: center;
-                    color: #90ee90;
-                ">
-                    <h2 style="font-size: 28px; margin-bottom: 10px;">💰 Total Cost</h2>
-                    <div style="font-size: 40px; font-weight: bold;">
-                        ${total_value*1.02:,.2f}
-                    </div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+#         # Display the total value as the most important number
+#         st.markdown(
+#             f"""
+#             <div style="
+#                 margin-top: 30px;
+#                 width: 100%;
+#             ">
+#                 <div style="
+#                     background: rgba(255, 255, 255, 0.05);
+#                     border: 1px solid rgba(255, 255, 255, 0.1);
+#                     border-radius: 16px;
+#                     padding: 30px 40px;
+#                     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+#                     backdrop-filter: blur(8px);
+#                     -webkit-backdrop-filter: blur(8px);
+#                     text-align: center;
+#                     color: #90ee90;
+#                 ">
+#                     <h2 style="font-size: 28px; margin-bottom: 10px;">💰 Total Cost</h2>
+#                     <div style="font-size: 40px; font-weight: bold;">
+#                         ${total_value*1.02:,.2f}
+#                     </div>
+#                 </div>
+#             </div>
+#             """,
+#             unsafe_allow_html=True
+#         )
 
 # # Create two columns for side-by-side buttons
 # col1, col2 = st.columns(2)
