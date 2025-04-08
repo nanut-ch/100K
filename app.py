@@ -331,7 +331,7 @@ if st.session_state.contract_date:
                                 # Step 2: Group by strike and apply pooling logic per group
                                 result_frames = []
 
-                                for strike, group in filtered_data.groupby("Stk Price"):
+                                for (strike, exp_date), group in filtered_data.groupby(["Stk Price", "Exp Date"]):
                                     group_sorted = group.sort_values("Row Index").copy()
 
                                     pooled_fraction = 0
@@ -391,7 +391,7 @@ if st.session_state.contract_date:
                                 final_df = pd.concat(result_frames).sort_values("Row Index")
 
                                 # Step 4: Display results
-                                st.write("### Purchase History with Fill Logic (Grouped by Strike Price)")
+                                st.write("### Purchase History with Fill Logic (Grouped by Strike Price and Expiry Date)")
                                 st.dataframe(final_df)
                             
                                 st.session_state.daily_orderbook = final_df
