@@ -16,8 +16,11 @@ st.header("Monthly Summary")
 
 # Check if purchase history exists
 if "purchase_history" in st.session_state:
-    # Ensure Sim Date is datetime
-    st.session_state.purchase_history["Sim Date"] = pd.to_datetime(st.session_state.purchase_history["Sim Date"])
+    # Create a local copy of the DataFrame
+    purchase_history = st.session_state.purchase_history.copy()
+
+    # Add a new column with parsed datetime values
+    purchase_history["Sim Date Parsed"] = pd.to_datetime(purchase_history["Sim Date"])
 
     # User selects a month
     selected_month = st.selectbox(
@@ -29,15 +32,15 @@ if "purchase_history" in st.session_state:
     start_of_month = pd.to_datetime(selected_month + "-01")
     end_of_month = (start_of_month + pd.offsets.MonthEnd(1))
 
-    # Filter data for selected month
-    filtered_data = st.session_state.purchase_history[
-        (st.session_state.purchase_history["Sim Date"] >= start_of_month) &
-        (st.session_state.purchase_history["Sim Date"] <= end_of_month)
+    # Filter data for selected month using the new column
+    filtered_data = purchase_history[
+        (purchase_history["Sim Date Parsed"] >= start_of_month) &
+        (purchase_history["Sim Date Parsed"] <= end_of_month)
     ]
 
     if not filtered_data.empty:
         # Group by day and sum profit
-        profit_by_date = filtered_data.groupby(filtered_data["Sim Date"].dt.date)["Profit"].sum().reset_index()
+        profit_by_date = filtered_data.groupby(filtered_data["Sim Date Parsed"].dt.date)["Profit"].sum().reset_index()
         profit_by_date.columns = ["Date", "Total Profit"]
 
         # Create full date range for the selected month

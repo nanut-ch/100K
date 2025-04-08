@@ -261,6 +261,18 @@ if st.session_state.contract_date:
                 
                     st.text_input("**Your name**", key="name")
 
+                    fill_choice = st.segmented_control(
+                        "Fill Strategy",
+                        options=[
+                            "✅ Fill full contracts now + match fractions EOD",
+                            "⏳ Wait to fill full quantity at EOD only"
+                        ],
+                        help="Choose whether to immediately fill full contracts and wait to match fractions, or wait until the entire requested amount (including fraction) is available at end of day."
+                    )
+
+                    # Map the selected option to a corresponding value
+                    fill_choice_value = 0 if fill_choice == "✅ Fill full contracts now + match fractions EOD" else 1
+
                     # Button to purchase insurance
                     if st.button("Purchase Insurance"):
                         # Check if the user has entered their name
@@ -288,7 +300,8 @@ if st.session_state.contract_date:
                                 "Sett. Price": settlement_price,
                                 "Raw Cost": raw_cost,
                                 "Profit": raw_cost * margin_applied,
-                                "Total Cost": total_cost
+                                "Total Cost": total_cost,
+                                "Fill Strategy": fill_choice_value
                             }
 
                             # Append the purchase details to the session state DataFrame

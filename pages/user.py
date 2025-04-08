@@ -5,9 +5,15 @@ from datetime import datetime
 
 st.logo("logo.png", size = "large")
 
-st.header("Query User Purchase History")
-
 st.text_input("**Your name**", key="checkname")
+
+st.header("Query User Purchase (Today)")
+
+st.metric(label="Current Date", value=st.session_state.current_date.strftime("%Y-%m-%d"))
+
+st.divider()
+
+st.header("Query User Purchase (History)")
 
 if "purchase_history" in st.session_state:
     # Get the name from the text input
