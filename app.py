@@ -10,8 +10,8 @@ margin_applied = 0.1
 st.logo("logo.png", size = "large")
 
 # Initialize an empty DataFrame to store simulation dates
-if "sim_data" not in st.session_state:
-    st.session_state.sim_data = pd.DataFrame(columns=["sim_date"])
+#if "sim_data" not in st.session_state:
+#    st.session_state.sim_data = pd.DataFrame(columns=["sim_date"])
 
 # Initialize the current date in session state if not already set
 if "current_date" not in st.session_state:
@@ -45,12 +45,20 @@ with st.sidebar:
 
         # Append the purchase details to the session state DataFrame
         if "daily_orderbook_history" not in st.session_state:
-            st.session_state.daily_orderbook_history = st.session_state.daily_orderbook.copy()
+            if "daily_orderbook" in st.session_state:
+                st.session_state.daily_orderbook_history = st.session_state.daily_orderbook.copy()
         else:
-            st.session_state.daily_orderbook_history = pd.concat(
-            [st.session_state.daily_orderbook_history, st.session_state.daily_orderbook],
-            ignore_index=True
-            )
+            if not st.session_state.daily_orderbook.empty:
+                st.session_state.daily_orderbook_history = pd.concat(
+                [st.session_state.daily_orderbook_history, st.session_state.daily_orderbook],
+                ignore_index=True
+                )
+        
+        for key in ["contract_date_selector", "contract_date", "daily_orderbook", "number_of_barrels"]:
+            st.session_state.pop(key, None)
+
+#st.write("📦 Current Session State Keys:")
+#st.write(list(st.session_state.keys()))
 
 # Read the file 'clc1' and plot data
 try:
@@ -125,7 +133,7 @@ st.divider()
 st.subheader("Quantity of protection")
 
 # Dropdown to choose between "Number of Contracts" or "Barrels of Oil"
-quantity_type = st.selectbox("Choose Quantity Type:", ["Number of Contracts", "Barrels of Oil"])
+quantity_type = st.selectbox("Choose Quantity Type:", ["Barrels of Oil", "Number of Contracts"])
 
 # Display the appropriate slider based on the dropdown selection
 if quantity_type == "Barrels of Oil":
@@ -344,7 +352,7 @@ if st.session_state.contract_date:
                             # Step 2: Group by strike and apply pooling logic per group
                             result_frames = []
 
-                            for strike, group in filtered_data.groupby("Stk Price"):
+                            for (strike, exp_date), group in filtered_data.groupby(["Stk Price", "Exp Date"]):
                                 group_sorted = group.sort_values("Row Index").copy()
 
                                 pooled_fraction = 0
