@@ -15,9 +15,9 @@ st.divider()
 st.header("Monthly Summary")
 
 # Check if purchase history exists
-if "purchase_history" in st.session_state:
+if "daily_orderbook_history" in st.session_state:
     # Create a local copy of the DataFrame
-    purchase_history = st.session_state.purchase_history.copy()
+    purchase_history = st.session_state.daily_orderbook_history.copy()
 
     # Add a new column with parsed datetime values
     purchase_history["Sim Date Parsed"] = pd.to_datetime(purchase_history["Sim Date"])
@@ -71,3 +71,8 @@ if "purchase_history" in st.session_state:
         st.write(f"No purchase history found for {selected_month}.")
 else:
     st.write("No purchase history found.")
+
+
+st.dataframe(st.session_state.daily_orderbook)
+
+#st.dataframe(st.session_state.daily_orderbook_history)

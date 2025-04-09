@@ -21,22 +21,36 @@ st.header("Guardian")
 st.subheader("Information on current day")
 
 # Move the buttons to the sidebar
+# with st.sidebar:
+
+#     st.subheader("Date Navigation")
+
+#     # Create two columns for side-by-side buttons
+#     col1, col2 = st.columns(2)
+
+#     with col1:
+#         # Button to decrement the date
+#         if st.button("⬅️ Prev Day"):
+#             st.session_state.current_date -= datetime.timedelta(days=1)
+
+#     with col2:
+#         # Button to increment the date
+#         if st.button("Next Day ➡️"):
+#             st.session_state.current_date += datetime.timedelta(days=1)
+
+# Button to increment the date
 with st.sidebar:
+    if st.button("END DAY ➡️"):
+        st.session_state.current_date += datetime.timedelta(days=1)
 
-    st.subheader("Date Navigation")
-
-    # Create two columns for side-by-side buttons
-    col1, col2 = st.columns(2)
-
-    with col1:
-        # Button to decrement the date
-        if st.button("⬅️ Prev Day"):
-            st.session_state.current_date -= datetime.timedelta(days=1)
-
-    with col2:
-        # Button to increment the date
-        if st.button("Next Day ➡️"):
-            st.session_state.current_date += datetime.timedelta(days=1)
+        # Append the purchase details to the session state DataFrame
+        if "daily_orderbook_history" not in st.session_state:
+            st.session_state.daily_orderbook_history = st.session_state.daily_orderbook.copy()
+        else:
+            st.session_state.daily_orderbook_history = pd.concat(
+            [st.session_state.daily_orderbook_history, st.session_state.daily_orderbook],
+            ignore_index=True
+            )
 
 # Read the file 'clc1' and plot data
 try:
@@ -114,21 +128,8 @@ st.subheader("Quantity of protection")
 quantity_type = st.selectbox("Choose Quantity Type:", ["Number of Contracts", "Barrels of Oil"])
 
 # Display the appropriate slider based on the dropdown selection
-if quantity_type == "Number of Contracts":
-    slider_value = st.slider("Number of Contracts:", min_value=1, max_value=100, value=10)
-    
-    # Display the number of contracts and equivalent barrels using st.metric
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.metric(label="Number of Contracts", value=slider_value)
-
-    with col2:
-        st.metric(label="Equivalent in Barrels", value=f"{slider_value * 1000} barrels")
-
-    st.session_state.number_of_barrels = slider_value * 1000  # Store the number of contracts for later use
-elif quantity_type == "Barrels of Oil":
-    slider_value = st.slider("Number of Barrels:", min_value=0, max_value=10000, value=5000)
+if quantity_type == "Barrels of Oil":
+    slider_value = st.number_input("Number of Barrels:", min_value=0, max_value=100000, value=5000, step=1)
 
     # Display the number of barrels and equivalent contracts using st.metric
     col1, col2 = st.columns(2)
@@ -140,7 +141,19 @@ elif quantity_type == "Barrels of Oil":
         st.metric(label="Equivalent in Contracts", value=f"{slider_value / 1000:.2f} contracts")
 
     st.session_state.number_of_barrels = slider_value  # Store the number of contracts for later use
+elif quantity_type == "Number of Contracts":
+    slider_value = st.number_input("Number of Contracts:", min_value=1, max_value=100, value=10, step=1)
+    
+    # Display the number of contracts and equivalent barrels using st.metric
+    col1, col2 = st.columns(2)
 
+    with col1:
+        st.metric(label="Number of Contracts", value=slider_value)
+
+    with col2:
+        st.metric(label="Equivalent in Barrels", value=f"{slider_value * 1000} barrels")
+
+    st.session_state.number_of_barrels = slider_value * 1000  # Store the number of contracts for later use
 
 
 st.subheader("Product specification")
@@ -315,86 +328,97 @@ if st.session_state.contract_date:
                             st.success("Insurance purchased successfully!")
 
                             # CORE LOGIC
-                            if "purchase_history" in st.session_state:
-                                # Step 0: Filter for the current Sim Date
-                                filtered_data = st.session_state.purchase_history[
-                                    st.session_state.purchase_history["Sim Date"] == st.session_state.current_date
-                                ].copy()
+                        if "purchase_history" in st.session_state:
+                            # Step 0: Filter for the current Sim Date
+                            filtered_data = st.session_state.purchase_history[
+                                st.session_state.purchase_history["Sim Date"] == st.session_state.current_date
+                            ].copy()
 
-                                # Add row index to preserve original append order
-                                filtered_data["Row Index"] = filtered_data.index
+                            # Add row index to preserve original append order
+                            filtered_data["Row Index"] = filtered_data.index
 
-                                # Step 1: Split contracts into whole and decimal parts
-                                filtered_data["Whole Contracts"] = filtered_data["Contracts Bought"].apply(math.floor)
-                                filtered_data["Decimal Contracts"] = filtered_data["Contracts Bought"] - filtered_data["Whole Contracts"]
+                            # Step 1: Split contracts into whole and decimal parts
+                            filtered_data["Whole Contracts"] = filtered_data["Contracts Bought"].apply(math.floor)
+                            filtered_data["Decimal Contracts"] = filtered_data["Contracts Bought"] - filtered_data["Whole Contracts"]
 
-                                # Step 2: Group by strike and apply pooling logic per group
-                                result_frames = []
+                            # Step 2: Group by strike and apply pooling logic per group
+                            result_frames = []
 
-                                for (strike, exp_date), group in filtered_data.groupby(["Stk Price", "Exp Date"]):
-                                    group_sorted = group.sort_values("Row Index").copy()
+                            for strike, group in filtered_data.groupby("Stk Price"):
+                                group_sorted = group.sort_values("Row Index").copy()
 
-                                    pooled_fraction = 0
-                                    pooled_before = []
-                                    pooled_after = []
-                                    needed_list = []
-                                    used_from_row = []
-                                    fraction_filled = []
-                                    residuals = []
+                                pooled_fraction = 0
+                                pooled_before = []
+                                pooled_after = []
+                                needed_list = []
+                                used_from_row = []
+                                fraction_filled = []
+                                residuals = []
 
-                                    for idx, row in group_sorted.iterrows():
-                                        user_decimal = row["Decimal Contracts"]
+                                for idx, row in group_sorted.iterrows():
+                                    user_decimal = row["Decimal Contracts"]
 
+                                    # ✅ NEW: If this row has no decimal contracts, skip pooling logic
+                                    if user_decimal == 0:
                                         pooled_before.append(pooled_fraction)
-                                        needed = 1 - pooled_fraction if pooled_fraction > 0 else 0
-                                        needed_list.append(needed)
-
-                                        if user_decimal >= needed and pooled_fraction > 0:
-                                            used = needed
-                                            pooled_fraction = user_decimal - used
-                                            fraction_filled.append(1)
-                                        else:
-                                            used = 0
-                                            pooled_fraction += user_decimal
-                                            fraction_filled.append(0)
-
+                                        needed_list.append(0)
                                         pooled_after.append(pooled_fraction)
-                                        used_from_row.append(used)
-                                        residuals.append(user_decimal - used)
+                                        used_from_row.append(0)
+                                        fraction_filled.append(0)
+                                        residuals.append(0)
+                                        continue  # Skip to next row
 
-                                    # Add debug columns to group
-                                    group_sorted["Pooled Fraction Before"] = pooled_before
-                                    group_sorted["Needed to Complete 1"] = needed_list
-                                    group_sorted["Decimal Used From This Row"] = used_from_row
-                                    group_sorted["Pooled Fraction After"] = pooled_after
-                                    group_sorted["Fraction Filled (via Pool)"] = fraction_filled
-                                    group_sorted["Decimal Contracts Outstanding"] = residuals
+                                    # Normal pooling logic
+                                    pooled_before.append(pooled_fraction)
+                                    needed = 1 - pooled_fraction if pooled_fraction > 0 else 0
+                                    needed_list.append(needed)
 
-                                    # ✅ Add Order Filled column
-                                    dco_list = group_sorted["Decimal Contracts Outstanding"].tolist()
-                                    fraction_filled_list = group_sorted["Fraction Filled (via Pool)"].tolist()
-                                    filled_flags = []
+                                    if user_decimal >= needed and pooled_fraction > 0:
+                                        used = needed
+                                        pooled_fraction = user_decimal - used
+                                        fraction_filled.append(1)
+                                    else:
+                                        used = 0
+                                        pooled_fraction += user_decimal
+                                        fraction_filled.append(0)
 
-                                    for i in range(len(group_sorted)):
-                                        if dco_list[i] == 0:
-                                            filled_flags.append(1)
-                                        elif 1 in fraction_filled_list[i+1:]:  # Safe even on last row
-                                            filled_flags.append(1)
-                                        else:
-                                            filled_flags.append(0)
+                                    pooled_after.append(pooled_fraction)
+                                    used_from_row.append(used)
+                                    residuals.append(user_decimal - used)
 
-                                    group_sorted["Order Filled"] = filled_flags
+                                # Add debug columns to group
+                                group_sorted["Pooled Fraction Before"] = pooled_before
+                                group_sorted["Needed to Complete 1"] = needed_list
+                                group_sorted["Decimal Used From This Row"] = used_from_row
+                                group_sorted["Pooled Fraction After"] = pooled_after
+                                group_sorted["Fraction Filled (via Pool)"] = fraction_filled
+                                group_sorted["Decimal Contracts Outstanding"] = residuals
 
-                                    result_frames.append(group_sorted)
+                                # ✅ Add Order Filled column
+                                dco_list = group_sorted["Decimal Contracts Outstanding"].tolist()
+                                fraction_filled_list = group_sorted["Fraction Filled (via Pool)"].tolist()
+                                filled_flags = []
 
-                                # Step 3: Combine all grouped results and restore original row order
-                                final_df = pd.concat(result_frames).sort_values("Row Index")
+                                for i in range(len(group_sorted)):
+                                    if dco_list[i] == 0:
+                                        filled_flags.append(1)
+                                    elif 1 in fraction_filled_list[i+1:]:  # Safe even on last row
+                                        filled_flags.append(1)
+                                    else:
+                                        filled_flags.append(0)
 
-                                # Step 4: Display results
-                                st.write("### Purchase History with Fill Logic (Grouped by Strike Price and Expiry Date)")
-                                st.dataframe(final_df)
-                            
-                                st.session_state.daily_orderbook = final_df
+                                group_sorted["Order Filled"] = filled_flags
+
+                                result_frames.append(group_sorted)
+
+                            # Step 3: Combine all grouped results and restore original row order
+                            final_df = pd.concat(result_frames).sort_values("Row Index")
+
+                            # Step 4: Display results
+                            st.write("### Purchase History with Fill Logic (Grouped by Strike Price)")
+                            st.dataframe(final_df)
+
+                            st.session_state.daily_orderbook = final_df
 
                         else:
                             st.error("Unable to purchase insurance. Please ensure all selections are valid.")

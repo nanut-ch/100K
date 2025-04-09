@@ -27,12 +27,28 @@ if "purchase_history" in st.session_state:
 
     # Display the filtered data
     if not filtered_data.empty:
-        st.write(f"### Purchase History for {user_name}")
-        st.dataframe(filtered_data)
+        st.write(f"### Current Holdings for {user_name}")
+        #st.dataframe(filtered_data)
+
+        filtered_data["Select"] = False
+
+
+        selected_rows = st.data_editor(
+            filtered_data,
+            column_order=["Select", "User Name", "Stk Price", "Contracts Bought", "Order Filled"],
+            use_container_width=True,
+            num_rows="fixed",         # 🔒 Prevents adding new rows
+            hide_index=True
+        )
+
+        st.button("Sell Selected")
     else:
         st.write(f"No purchase history found for {user_name}.")
 else:
     st.write("No purchase history available.")
+
+
+
 
 if "daily_orderbook" in st.session_state:
     # Filter the daily order book for the matching user name
@@ -51,9 +67,8 @@ if "daily_orderbook" in st.session_state:
 
     # Display the filtered data
     if not filtered_data.empty:
-        st.write(f"### Daily Order Book for {user_name}")
+        st.write(f"### Daily Purchase Book for {user_name}")
         st.dataframe(filtered_data)
     else:
-        st.write(f"No daily order book found for {user_name}.")
-
+        st.write(f"No Daily Purchase Book found for {user_name}.")
     
