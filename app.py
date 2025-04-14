@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 import altair as alt
 import math
+import uuid
 
 
 margin_applied = 0.1
@@ -15,7 +16,7 @@ st.logo("logo.png", size = "large")
 
 # Initialize the current date in session state if not already set
 if "current_date" not in st.session_state:
-    st.session_state.current_date = datetime.date(2024, 1, 2)
+    st.session_state.current_date = datetime.date(2024, 1, 31)
 
 st.header("Guardian")
 st.subheader("Information on current day")
@@ -46,12 +47,39 @@ with st.sidebar:
         # Append the purchase details to the session state DataFrame
         if "daily_orderbook_history" not in st.session_state:
             if "daily_orderbook" in st.session_state:
+                st.session_state.daily_orderbook["Contracts Held"] = st.session_state.daily_orderbook.apply(
+                    lambda row: row["Whole Contracts"] + (row["Decimal Contracts"] if row["Order Filled"] == 1 else row["Decimal Used From This Row"]),
+                    axis=1
+                )
                 st.session_state.daily_orderbook_history = st.session_state.daily_orderbook.copy()
         else:
             if not st.session_state.daily_orderbook.empty:
+                st.session_state.daily_orderbook["Contracts Held"] = st.session_state.daily_orderbook.apply(
+                    lambda row: row["Whole Contracts"] + (row["Decimal Contracts"] if row["Order Filled"] == 1 else row["Decimal Used From This Row"]),
+                    axis=1
+                )
                 st.session_state.daily_orderbook_history = pd.concat(
                 [st.session_state.daily_orderbook_history, st.session_state.daily_orderbook],
                 ignore_index=True
+                )
+
+        # Append the sell details to the session state DataFrame
+        if "daily_sellbook_history" not in st.session_state:
+            if "daily_sellbook" in st.session_state:
+                st.session_state.daily_sellbook["Contracts Sold"] = st.session_state.daily_sellbook.apply(
+                    lambda row: row["Whole Contracts"] + (row["Decimal Contracts"] if row["Order Filled"] == 1 else row["Decimal Used From This Row"]),
+                    axis=1
+                )
+                st.session_state.daily_sellbook_history = st.session_state.daily_sellbook.copy()
+        else:
+            if not st.session_state.daily_sellbook.empty:
+                st.session_state.daily_sellbook["Contracts Sold"] = st.session_state.daily_sellbook.apply(
+                    lambda row: row["Whole Contracts"] + (row["Decimal Contracts"] if row["Order Filled"] == 1 else row["Decimal Used From This Row"]),
+                    axis=1
+                )
+                st.session_state.daily_sellbook_history = pd.concat(
+                    [st.session_state.daily_sellbook_history, st.session_state.daily_sellbook],
+                    ignore_index=True
                 )
         
         for key in ["contract_date_selector", "contract_date", "daily_orderbook", "number_of_barrels"]:
@@ -62,30 +90,29 @@ with st.sidebar:
 
 # Read the file 'clc1' and plot data
 try:
+        # Load and preprocess
     df = pd.read_csv("clc1.csv")
-    df['Date'] = pd.to_datetime(df['Date'])  # Ensure the 'Date' column is in datetime format
+    df['Date'] = pd.to_datetime(df['Date'])  # Ensure Date column is datetime
 
-    # Convert current_date to datetime for comparison
+    # Convert current date from session
     current_date = pd.to_datetime(st.session_state.current_date)
     start_date = current_date - pd.Timedelta(days=365)
 
-    # Filter data for the last year
+    # Filter last 1 year
     filtered_df = df[(df['Date'] >= start_date) & (df['Date'] <= current_date)]
 
-    # Filter data for the current date
+    # ✅ Try to get the exact date
     current_date_row = filtered_df[filtered_df['Date'] == current_date]
 
-    # Check if the row exists and extract the value, otherwise set current_price to None
     if not current_date_row.empty:
         current_price = current_date_row['Close Price'].iloc[0]
     else:
-        current_price = None
-
-    # Format the 'Date' column to display only the date (YYYY-MM-DD)
-    filtered_df['Date'] = filtered_df['Date'].dt.date
-
-    #st.write("### Filtered Data (Last Year):")
-    #st.dataframe(filtered_df)
+        # ✅ Fallback: Get the most recent available trading day before current_date
+        previous_row = filtered_df[filtered_df['Date'] < current_date].sort_values("Date", ascending=False).head(1)
+        if not previous_row.empty:
+            current_price = previous_row['Close Price'].iloc[0]
+        else:
+            current_price = None  # No data in the past year
 
     # Calculate y-axis limits
     y_min = filtered_df['Close Price'].min() - 10
@@ -111,9 +138,19 @@ try:
 
     with col1:
         if current_price is not None:
-            st.metric(label="Current Price", value=f"${current_price:.2f}")
+            # Check if it's a fallback day
+            if current_date_row.empty and not previous_row.empty:
+                price_date = previous_row['Date'].iloc[0].strftime("%A, %b %d")
+                st.metric(
+                    label="Current Price",
+                    value=f"${current_price:.2f}",
+                    delta=f"Last available price from {price_date}"
+                )
+            else:
+                st.metric(label="Current Price", value=f"${current_price:.2f}")
         else:
             st.metric(label="Current Price", value="N/A")
+
 
     with col2:
         # Display the current date using st.metric
@@ -281,18 +318,20 @@ if st.session_state.contract_date:
                     st.metric(label="Price of Insurance per Barrel", value=f"${filtered_df_strike_date['Settlement Price'].iloc[0]*margin_applied:.2f}")
                 
                     st.text_input("**Your name**", key="name")
+                    
+                    # fill_choice = st.segmented_control(
+                    #     "Fill Strategy",
+                    #     options=[
+                    #         "✅ Fill full contracts now + match fractions EOD",
+                    #         "⏳ Wait to fill full quantity at EOD only"
+                    #     ],
+                    #     help="Choose whether to immediately fill full contracts and wait to match fractions, or wait until the entire requested amount (including fraction) is available at end of day."
+                    # )
 
-                    fill_choice = st.segmented_control(
-                        "Fill Strategy",
-                        options=[
-                            "✅ Fill full contracts now + match fractions EOD",
-                            "⏳ Wait to fill full quantity at EOD only"
-                        ],
-                        help="Choose whether to immediately fill full contracts and wait to match fractions, or wait until the entire requested amount (including fraction) is available at end of day."
-                    )
+                    # # Map the selected option to a corresponding value
+                    # fill_choice_value = 0 if fill_choice == "✅ Fill full contracts now + match fractions EOD" else 1
 
-                    # Map the selected option to a corresponding value
-                    fill_choice_value = 0 if fill_choice == "✅ Fill full contracts now + match fractions EOD" else 1
+                    fill_choice_value = 0
 
                     # Button to purchase insurance
                     if st.button("Purchase Insurance"):
@@ -362,6 +401,7 @@ if st.session_state.contract_date:
                                 used_from_row = []
                                 fraction_filled = []
                                 residuals = []
+                                unique_id = []
 
                                 for idx, row in group_sorted.iterrows():
                                     user_decimal = row["Decimal Contracts"]
@@ -374,6 +414,7 @@ if st.session_state.contract_date:
                                         used_from_row.append(0)
                                         fraction_filled.append(0)
                                         residuals.append(0)
+                                        unique_id.append(str(uuid.uuid4()))  # Generate a unique ID for each row
                                         continue  # Skip to next row
 
                                     # Normal pooling logic
@@ -393,6 +434,7 @@ if st.session_state.contract_date:
                                     pooled_after.append(pooled_fraction)
                                     used_from_row.append(used)
                                     residuals.append(user_decimal - used)
+                                    unique_id.append(str(uuid.uuid4()))  # Generate a unique ID for each row
 
                                 # Add debug columns to group
                                 group_sorted["Pooled Fraction Before"] = pooled_before
@@ -401,6 +443,7 @@ if st.session_state.contract_date:
                                 group_sorted["Pooled Fraction After"] = pooled_after
                                 group_sorted["Fraction Filled (via Pool)"] = fraction_filled
                                 group_sorted["Decimal Contracts Outstanding"] = residuals
+                                group_sorted["UniqueID"] = unique_id
 
                                 # ✅ Add Order Filled column
                                 dco_list = group_sorted["Decimal Contracts Outstanding"].tolist()

@@ -43,3 +43,11 @@ if "purchase_history" in st.session_state:
         st.write(f"No purchase history found for {st.session_state.current_date}.")
 else:
     st.write("No purchase history available.")
+
+
+
+st.dataframe(st.session_state.daily_orderbook_history)
+st.dataframe(st.session_state.sale_history)
+
+st.dataframe(st.session_state.daily_orderbook_history)
+st.dataframe(st.session_state.sale_history)

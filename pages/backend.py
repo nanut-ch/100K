@@ -72,7 +72,9 @@ if "daily_orderbook_history" in st.session_state:
 else:
     st.write("No purchase history found.")
 
-
-st.dataframe(st.session_state.daily_orderbook)
+if "daily_orderbook" in st.session_state:
+    st.dataframe(st.session_state.daily_orderbook)
+else:
+    st.write("No daily orderbook found.")
 
 #st.dataframe(st.session_state.daily_orderbook_history)
