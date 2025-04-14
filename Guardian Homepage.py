@@ -174,7 +174,7 @@ quantity_type = st.selectbox("Choose Quantity Type:", ["Barrels of Oil", "Number
 
 # Display the appropriate slider based on the dropdown selection
 if quantity_type == "Barrels of Oil":
-    slider_value = st.number_input("Number of Barrels:", min_value=0, max_value=100000, value=5000, step=1)
+    slider_value = st.number_input("Number of Barrels:", min_value=0, max_value=100000, value=1300, step=1)
 
     # Display the number of barrels and equivalent contracts using st.metric
     col1, col2 = st.columns(2)
@@ -470,6 +470,10 @@ if st.session_state.contract_date:
                             st.dataframe(final_df)
 
                             st.session_state.daily_orderbook = final_df
+
+                            for key in ["name", "number_of_barrels", "selected_strike", "fill_choice_value"]:
+                                if key in st.session_state:
+                                    del st.session_state[key]
 
                         else:
                             st.error("Unable to purchase insurance. Please ensure all selections are valid.")
