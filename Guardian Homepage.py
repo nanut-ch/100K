@@ -4,6 +4,7 @@ import datetime
 import altair as alt
 import math
 
+st.set_page_config(page_title="Guardian User Home")
 
 margin_applied = 0.1
 
@@ -15,7 +16,7 @@ st.logo("logo.png", size = "large")
 
 # Initialize the current date in session state if not already set
 if "current_date" not in st.session_state:
-    st.session_state.current_date = datetime.date(2024, 1, 2)
+    st.session_state.current_date = datetime.date(2024, 1, 31)
 
 st.header("Guardian")
 st.subheader("Information on current day")
@@ -137,7 +138,7 @@ quantity_type = st.selectbox("Choose Quantity Type:", ["Barrels of Oil", "Number
 
 # Display the appropriate slider based on the dropdown selection
 if quantity_type == "Barrels of Oil":
-    slider_value = st.number_input("Number of Barrels:", min_value=0, max_value=100000, value=5000, step=1)
+    slider_value = st.number_input("Number of Barrels:", min_value=0, max_value=100000, value=1550, step=1)
 
     # Display the number of barrels and equivalent contracts using st.metric
     col1, col2 = st.columns(2)
@@ -282,17 +283,19 @@ if st.session_state.contract_date:
                 
                     st.text_input("**Your name**", key="name")
 
-                    fill_choice = st.segmented_control(
-                        "Fill Strategy",
-                        options=[
-                            "✅ Fill full contracts now + match fractions EOD",
-                            "⏳ Wait to fill full quantity at EOD only"
-                        ],
-                        help="Choose whether to immediately fill full contracts and wait to match fractions, or wait until the entire requested amount (including fraction) is available at end of day."
-                    )
+                    # fill_choice = st.segmented_control(
+                    #     "Fill Strategy",
+                    #     options=[
+                    #         "✅ Fill full contracts now + match fractions EOD",
+                    #         "⏳ Wait to fill full quantity at EOD only"
+                    #     ],
+                    #     help="Choose whether to immediately fill full contracts and wait to match fractions, or wait until the entire requested amount (including fraction) is available at end of day."
+                    # )
 
-                    # Map the selected option to a corresponding value
-                    fill_choice_value = 0 if fill_choice == "✅ Fill full contracts now + match fractions EOD" else 1
+                    # # Map the selected option to a corresponding value
+                    # fill_choice_value = 0 if fill_choice == "✅ Fill full contracts now + match fractions EOD" else 1
+
+                    fill_choice_value = 0
 
                     # Button to purchase insurance
                     if st.button("Purchase Insurance"):
@@ -427,6 +430,10 @@ if st.session_state.contract_date:
                             st.dataframe(final_df)
 
                             st.session_state.daily_orderbook = final_df
+
+                            for key in ["name", "number_of_barrels", "selected_strike", "fill_choice_value"]:
+                                if key in st.session_state:
+                                    del st.session_state[key]
 
                         else:
                             st.error("Unable to purchase insurance. Please ensure all selections are valid.")

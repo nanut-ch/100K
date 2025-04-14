@@ -3,6 +3,8 @@ import pandas as pd
 import altair as alt
 from datetime import datetime
 
+st.set_page_config(page_title="Guardian User View")
+
 st.logo("logo.png", size = "large")
 
 st.text_input("**Your name**", key="checkname")

@@ -5,6 +5,8 @@ from datetime import datetime
 
 st.logo("logo.png", size = "large")
 
+st.set_page_config(page_title="Guardian Admin Home")
+
 st.header("Backend")
 
 # Clear session state button
